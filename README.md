@@ -1,0 +1,1 @@
+Created by Willow Jordan. This will be an application that allows 2-6 players (including CPUs, if desired) to play a game of Rummy. It will only display the current player's hand, and will have a confirmation screen between turns to ensure players do not see each others' hands when passing their turn.
