@@ -6,9 +6,10 @@ import random
 import tkinter as tk
 
 from player import Player
+from card import Card, Suit
 
 # UI CONSTANTS
-BG_COLOR = "lightblue"
+BG_COLOR = "darkgreen"
 BUTTON_WIDTH = 40
 BUTTON_HEIGHT = 7
 PAD = 10
@@ -46,26 +47,55 @@ class SettingsScreen(tk.Frame):
         self.backbutton.pack(pady=PAD)
 
     def start(self):
-        errormsg = ""
+        #TODO: handle settings
 
-        self.master.display(GameScreen(self.master, players=[Player(True)]))
+        self.master.display(GameScreen(self.master))
 
     def back(self):
         self.master.display(TitleScreen(self.master))
 
-class GameScreen(tk.Frame):
-    def __init__(self, master, players):
+class GameScreen(tk.Canvas):
+    def __init__(self, master, players=[]):
+        super().__init__(master, width=800, height=800, bd=0, highlightthickness=0, relief='ridge')
         self.master = master
         self.players = players
-        self.turn = random.randint(0, len(players)-1)
+        #self.turn = random.randint(0, len(players)-1)
+
+        self.drawBackground()
+
+    def drawBackground(self):
+        """Draw things that won't change."""
+        # component backgrounds
+        self.create_rectangle(0, 0, 800, 100, fill="darkred", width=0) # info
+        self.create_rectangle(0, 100, 800, 600, fill=BG_COLOR, width=0) # board
+        self.create_rectangle(0, 600, 800, 800, fill="darkred", width=0) # hand
+
+        # lines separating components
+        self.create_line(0, 100, 800, 100, width=2)
+        self.create_line(0, 600, 800, 600, width=2)
+
+        # border lines
+        self.create_line(0, 0, 0, 800, width=2)
+        self.create_line(0, 800, 800, 800, width=2)
+        self.create_line(800, 800, 800, 0, width=2)
+        self.create_line(800, 0, 0, 0, width=2)
+
+        self.players[0].hand = [Card(Suit.CLUBS, 1), Card(Suit.DIAMONDS, 13), Card(Suit.HEARTS, 11), Card(Suit.SPADES, 12)]
+        self.drawHand(0)
+    
+    def drawHand(self, player_id):
+        x = 0
+        for card in self.players[player_id].hand:
+            self.create_image(x, 600, image=card.image, anchor=tk.NW)
+            x += 100
 
 # main game object
 class Game(tk.Tk):
     def __init__(self):
         super().__init__()
         self.geometry("800x800")
-        self.title("Battleship")
-        self.configure(background=BG_COLOR)
+        self.title("Rummy")
+        self.configure(background="lightgray")
 
         self.current_screen = None # current frame being displayed
         self.display(TitleScreen(self))
@@ -79,5 +109,5 @@ class Game(tk.Tk):
 
 if __name__ == "__main__":
     game = Game()
-    #game.display(GameScreen(game, ComputerPlayer(IntermediateCPU(False))))
+    game.display(GameScreen(game, [Player(False), Player(True)]))
     game.mainloop()
