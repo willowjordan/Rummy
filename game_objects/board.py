@@ -1,12 +1,6 @@
 """This script defines the Board class, which represents a board upon which cards can be placed."""
 
-from card import Card, Suit
-from enum import Enum
-
-class CardGroupType(Enum):
-    NONE = 0
-    SET = 1
-    RUN = 2
+from game_objects.card import Card, Suit
 
 class CardGroup(list):
     def __init__(self, cards:list = []):
@@ -62,13 +56,13 @@ class Board():
         self.card_groups[group_id] = CardGroup(cards)
 
     def add_to_card_group(self, group_id:int, card:Card):
-        """Attempt to add the given card to the group with the given ID. If addition fails due to group type, return False. Otherwise return True."""
+        """Add given card to card group with given ID."""
         if group_id not in self.card_groups.keys(): 
             # create new card group
             self.make_card_group([card], group_id)
         group:CardGroup = self.card_groups[group_id]
         
-        if group.grouptype == CardGroupType.RUN:
+        """if group.grouptype == CardGroupType.RUN:
             # check if suit is correct
             if card.suit != group[0].suit: return False
             # check if card fits on one end or the other
@@ -88,7 +82,7 @@ class Board():
         # if no group type, can add no matter what
         group.append(card)
         group.sort_cards()
-        return True
+        return True"""
 
     def split_card_group(self, group_id:int, card:Card):
         """Split card group on given card. All cards before selected card will remain in group. All cards including and after selected card will be added to new group."""
