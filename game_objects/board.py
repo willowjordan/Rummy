@@ -1,15 +1,16 @@
 """This script defines the Board class, which represents a board upon which cards can be placed."""
 
-from game_objects.card import Card, Suit
+from game_objects.card import Card, Suit, Parent, DEFAULT_CARD_WIDTH, DEFAULT_CARD_HEIGHT
+import tkinter as tk
 
 class CardGroup(list):
-    def __init__(self, cards:list = []):
-        super.__init__(cards)
-    
-    def sort_cards(self):
+    def __init__(self, cards:list[Card] = []):
+        super().__init__(cards)
+
+    def sortCards(self):
         pass
 
-    def is_valid_run(self):
+    def isValidRun(self):
         """Return true if this card group is a valid run, false otherwise.
         THIS FUNCTION ASSUMES THE LIST IS SORTED.
         """
@@ -22,7 +23,7 @@ class CardGroup(list):
             if self[i].value != expected: return False
         return True
 
-    def is_valid_set(self):
+    def isValidSet(self):
         """Return true if this card group is a valid set, false otherwise.
         THIS FUNCTION ASSUMES THE LIST IS SORTED.
         """
@@ -33,13 +34,60 @@ class CardGroup(list):
             if self[i].suit in suits: return False
             suits.append(self[i].suit)
         return True
+    
+    def __str__(self):
+        rv = "CardGroup Object || Cards:\n"
+        for card in self:
+            rv += f"\t{card}\n"
+        return rv
 
 class Board():
-    def __init__(self):
+    def __init__(self, canvas:tk.Canvas):
         # A card group is a set or a run on the board. These cards will be grouped together when drawn
-        self.card_groups = {} # int => CardGroup
+        self.card_groups: dict[int, CardGroup] = {}
+        self.canvas = canvas
+        self.empty_rectangles = {} # card group id => canvas id for rectangle in that spot
+        self.empty_rectangle_hitboxes = {} # card group id => (x0, y0, x1, y1) for clickable region or rectangle
 
-    def get_next_group_id(self):
+        # drawing variables
+        self.START_X = 50
+        self.START_Y = 150
+        self.ROW_SPACING = 200
+        self.COL_SPACING = 180
+        self.ZOOM_FACTOR = 3
+        self.STACK_SPACING = 20
+
+    def draw(self):
+        """Determine spacing variables, then draw every card group."""
+        # clear empty rectangles if necessary
+        for id in self.empty_rectangles.values():
+            self.canvas.delete(id)
+        self.empty_rectangles = {}
+        self.empty_rectangle_hitboxes = {}
+        # TODO: determine board size/drawing variables
+        # will initially be 8 card groups but will expand to accommodate as many as possible
+        for i in range(0, 8):
+            self.drawCardGroup(i)
+
+    def drawCardGroup(self, group_id):
+        row = group_id // 4
+        col = group_id % 4
+        x = self.START_X + col * self.COL_SPACING
+        y = self.START_Y + row * self.ROW_SPACING
+        if group_id in self.card_groups:
+            # draw card group
+            for card in self.card_groups[group_id]:
+                card.draw(self.canvas, x, y, self.ZOOM_FACTOR)
+                x += self.STACK_SPACING
+                y += self.STACK_SPACING
+        else:
+            # draw empty rectangle
+            x1 = x + self.ZOOM_FACTOR * DEFAULT_CARD_WIDTH
+            y1 = y + self.ZOOM_FACTOR * DEFAULT_CARD_HEIGHT
+            self.empty_rectangles[group_id] = self.canvas.create_rectangle(x, y, x1, y1, fill = "darkgray", width=0)
+            self.empty_rectangle_hitboxes[group_id] = (x, y, x1, y1)
+
+    def getNextGID(self):
         # search for gaps in IDs
         for i in range(0, len(self.card_groups)):
             if i not in self.card_groups.keys():
@@ -47,47 +95,74 @@ class Board():
         # if no gap found, add ID at end of range
         return len(self.card_groups)
 
-    def make_card_group(self, cards:list, group_id:int = None):
-        """Create a new card group with the provided cards. If group_id is provided, use it. Add to dict if add is true."""
+    def makeGroup(self, cards:list, group_id:int = None):
+        """Create a new card group with the provided cards. If group_id is provided, use it."""
         if group_id is not None:
-            if group_id in self.card_groups.keys(): raise ValueError("make_card_group: Provided ID already in card group IDs")
+            if group_id in self.card_groups.keys(): raise ValueError("makeGroup: Provided ID already in card group IDs")
         else: # if none, determine id
-            group_id = self.get_next_group_id()
+            group_id = self.getNextGID()
+        # delete empty rectangle for this group
+        self.canvas.delete(self.empty_rectangles[group_id])
+        del self.empty_rectangles[group_id]
+        del self.empty_rectangle_hitboxes[group_id]
+        # make group
         self.card_groups[group_id] = CardGroup(cards)
+        # update all cards' internal info
+        for card in self.card_groups[group_id]:
+            card.parent_type = Parent.CARDGROUP
+            card.parent_id = group_id
+            card.card_id = len(self.card_groups[group_id]) - 1
+        # redraw
+        """if len(self.card_groups) == 8:
+            # board needs to be expanded, so redraw
+            self.draw()
+        else:
+            # draw the new card group
+            self.drawCardGroup(group_id)
+            print(self.card_groups[group_id])"""
 
-    def add_to_card_group(self, group_id:int, card:Card):
+    def addToGroup(self, group_id:int, card:Card):
         """Add given card to card group with given ID."""
         if group_id not in self.card_groups.keys(): 
             # create new card group
-            self.make_card_group([card], group_id)
-        group:CardGroup = self.card_groups[group_id]
-        
-        """if group.grouptype == CardGroupType.RUN:
-            # check if suit is correct
-            if card.suit != group[0].suit: return False
-            # check if card fits on one end or the other
-            min = group[0].value - 1
-            if min == 1: min = 13
-            max = group[len(group)-1].value + 1
-            if max == 13: max = 1
-            if (card.value != min) & (card.value != max):
-                return False
-        elif group.grouptype == CardGroupType.SET:
-            # check if value is correct
-            if card.value != group[0].value: return False
-            # check if suit isn't already present
-            for groupcard in group:
-                if groupcard.suit == card.suit:
-                    return False
-        # if no group type, can add no matter what
-        group.append(card)
-        group.sort_cards()
-        return True"""
+            self.makeGroup([], group_id)
+        self.card_groups[group_id].append(card) # add card
+        # update card's internal info
+        card.parent_type = Parent.CARDGROUP
+        card.parent_id = group_id
+        card.card_id = len(self.card_groups[group_id]) - 1
+        self.drawCardGroup(group_id) # redraw
+    
+    def removeFromGroup(self, group_id:int, card_id:int):
+        """Remove card with card_id from group with group_id"""
+        if group_id not in self.card_groups.keys():
+            raise ValueError("Provided group ID does not exist")
+        group = self.card_groups[group_id]
+        del group[card_id] # remove card from group
+        # update IDs for rest of group
+        for i in range(card_id, len(group)):
+            group[i].card_id = i
+        if len(self.card_groups[group_id]) == 0:
+            del self.card_groups[group_id]
+        self.drawCardGroup(group_id) # redraw group
 
-    def split_card_group(self, group_id:int, card:Card):
-        """Split card group on given card. All cards before selected card will remain in group. All cards including and after selected card will be added to new group."""
-        
-    def validate_card_groups(self):
+    def splitGroup(self, group_id:int, card_id:int, new_group_id:int):
+        """Split card group on given card. All cards before selected card will remain in group. All cards including and after selected card will be added to new group.
+        :param group_id: ID of group to split
+        :param card_id: In-group ID of card to split on
+        :param new_group_id: ID of new group (must not be an existing group)
+        """
+        if group_id not in self.card_groups.keys():
+            raise ValueError("Provided group ID to split doesn't exist")
+        new_group_cards = self.card_groups[group_id][card_id:]
+        self.card_groups[group_id] = self.card_groups[group_id][:card_id]
+        if len(self.card_groups[group_id]) == 0:
+            del self.card_groups[group_id]
+            self.drawCardGroup(group_id)
+        for card in new_group_cards:
+            self.addToGroup(new_group_id, card)
+
+    def validateGroups(self):
         """Return true if every card group is a valid run or set.
         All card groups must have at least 3 cards.
         Valid runs have sequential cards of the same suit.
@@ -97,7 +172,7 @@ class Board():
             # length check
             if len(cgroup) < 3: return False
             # sort before running validity checks
-            cgroup.sort_cards()
-            if (not cgroup.is_valid_run()) & (not cgroup.is_valid_set()):
+            cgroup.sortCards()
+            if (not cgroup.isValidRun()) & (not cgroup.isValidSet()):
                 return False
         return True
