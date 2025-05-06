@@ -42,6 +42,28 @@ class CardGroup(list):
         return rv
 
 class Board():
+    START_X = 25
+    START_Y = 125
+
+    DRAWVARS = {
+        1: {
+            "NUM_ROWS": 2,
+            "NUM_COLS": 4,
+            "ROW_SPACING": 200,
+            "COL_SPACING": 180,
+            "ZOOM_FACTOR": 2,
+            "STACK_SPACING": 20,
+        },
+        2: {
+            "NUM_ROWS": 4,
+            "NUM_COLS": 8,
+            "ROW_SPACING": 100,
+            "COL_SPACING": 90,
+            "ZOOM_FACTOR": 1,
+            "STACK_SPACING": 10,
+        }
+    }
+
     def __init__(self, canvas:tk.Canvas):
         # A card group is a set or a run on the board. These cards will be grouped together when drawn
         self.card_groups: dict[int, CardGroup] = {}
@@ -50,12 +72,17 @@ class Board():
         self.empty_rectangle_hitboxes = {} # card group id => (x0, y0, x1, y1) for clickable region or rectangle
 
         # drawing variables
-        self.START_X = 50
-        self.START_Y = 150
-        self.ROW_SPACING = 200
-        self.COL_SPACING = 180
-        self.ZOOM_FACTOR = 3
-        self.STACK_SPACING = 20
+        self.expand_level = 1
+        self.loadDrawingVars()
+
+    def loadDrawingVars(self):
+        """Load the drawing variables based on the current expand level."""
+        self.NUM_ROWS = Board.DRAWVARS[self.expand_level]["NUM_ROWS"]
+        self.NUM_COLS = Board.DRAWVARS[self.expand_level]["NUM_COLS"]
+        self.ROW_SPACING = Board.DRAWVARS[self.expand_level]["ROW_SPACING"]
+        self.COL_SPACING = Board.DRAWVARS[self.expand_level]["COL_SPACING"]
+        self.ZOOM_FACTOR = Board.DRAWVARS[self.expand_level]["ZOOM_FACTOR"]
+        self.STACK_SPACING = Board.DRAWVARS[self.expand_level]["STACK_SPACING"]
 
     def draw(self):
         """Determine spacing variables, then draw every card group."""
@@ -64,16 +91,34 @@ class Board():
             self.canvas.delete(id)
         self.empty_rectangles = {}
         self.empty_rectangle_hitboxes = {}
-        # TODO: determine board size/drawing variables
+
+        # determine board size/drawing variables
+        max_stacks = self.NUM_ROWS * self.NUM_COLS
+        if len(self.card_groups) >= max_stacks:
+            if (self.expand_level+1) in Board.DRAWVARS:
+                # expand board
+                self.expand_level += 1
+                self.loadDrawingVars()
+            else:
+                print("You have reached the maximum expand level")
+        elif len(self.card_groups) < (max_stacks / 4):
+            if (self.expand_level-1) in Board.DRAWVARS:
+                # collapse board
+                self.expand_level -= 1
+                self.loadDrawingVars()
+                # move all card groups to be within board
+                for i in range((max_stacks / 4), max_stacks):
+                    if i not in self.card_groups: continue
+                    self.splitGroup(i, 0, self.getNextGID(), draw=False)
         # will initially be 8 card groups but will expand to accommodate as many as possible
-        for i in range(0, 8):
+        for i in range(0, self.NUM_ROWS * self.NUM_COLS):
             self.drawCardGroup(i)
 
     def drawCardGroup(self, group_id):
-        row = group_id // 4
-        col = group_id % 4
-        x = self.START_X + col * self.COL_SPACING
-        y = self.START_Y + row * self.ROW_SPACING
+        row = group_id // self.NUM_COLS
+        col = group_id % self.NUM_COLS
+        x = Board.START_X + col * self.COL_SPACING
+        y = Board.START_Y + row * self.ROW_SPACING
         if group_id in self.card_groups:
             # draw card group
             for card in self.card_groups[group_id]:
@@ -95,7 +140,7 @@ class Board():
         # if no gap found, add ID at end of range
         return len(self.card_groups)
 
-    def makeGroup(self, cards:list, group_id:int = None):
+    def makeGroup(self, cards:list, group_id:int = None, draw = True):
         """Create a new card group with the provided cards. If group_id is provided, use it."""
         if group_id is not None:
             if group_id in self.card_groups.keys(): raise ValueError("makeGroup: Provided ID already in card group IDs")
@@ -113,15 +158,15 @@ class Board():
             card.parent_id = group_id
             card.card_id = len(self.card_groups[group_id]) - 1
         # redraw
-        """if len(self.card_groups) == 8:
-            # board needs to be expanded, so redraw
-            self.draw()
-        else:
-            # draw the new card group
-            self.drawCardGroup(group_id)
-            print(self.card_groups[group_id])"""
+        if draw:
+            if len(self.card_groups) == 8:
+                # board needs to be expanded, so redraw
+                self.draw()
+            else:
+                # draw the new card group
+                self.drawCardGroup(group_id)
 
-    def addToGroup(self, group_id:int, card:Card):
+    def addToGroup(self, group_id:int, card:Card, draw = True):
         """Add given card to card group with given ID."""
         if group_id not in self.card_groups.keys(): 
             # create new card group
@@ -131,9 +176,9 @@ class Board():
         card.parent_type = Parent.CARDGROUP
         card.parent_id = group_id
         card.card_id = len(self.card_groups[group_id]) - 1
-        self.drawCardGroup(group_id) # redraw
+        if draw: self.drawCardGroup(group_id) # redraw
     
-    def removeFromGroup(self, group_id:int, card_id:int):
+    def removeFromGroup(self, group_id:int, card_id:int, draw = True):
         """Remove card with card_id from group with group_id"""
         if group_id not in self.card_groups.keys():
             raise ValueError("Provided group ID does not exist")
@@ -144,9 +189,9 @@ class Board():
             group[i].card_id = i
         if len(self.card_groups[group_id]) == 0:
             del self.card_groups[group_id]
-        self.drawCardGroup(group_id) # redraw group
+        if draw: self.drawCardGroup(group_id) # redraw group
 
-    def splitGroup(self, group_id:int, card_id:int, new_group_id:int):
+    def splitGroup(self, group_id:int, card_id:int, new_group_id:int, draw = True):
         """Split card group on given card. All cards before selected card will remain in group. All cards including and after selected card will be added to new group.
         :param group_id: ID of group to split
         :param card_id: In-group ID of card to split on
@@ -158,9 +203,9 @@ class Board():
         self.card_groups[group_id] = self.card_groups[group_id][:card_id]
         if len(self.card_groups[group_id]) == 0:
             del self.card_groups[group_id]
-            self.drawCardGroup(group_id)
+            if draw: self.drawCardGroup(group_id)
         for card in new_group_cards:
-            self.addToGroup(new_group_id, card)
+            self.addToGroup(new_group_id, card, draw)
 
     def validateGroups(self):
         """Return true if every card group is a valid run or set.

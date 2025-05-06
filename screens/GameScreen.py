@@ -23,7 +23,12 @@ class GameScreen(tk.Canvas):
             Card(Suit.CLUBS, 1, Parent.HAND, 0, 0), 
             Card(Suit.DIAMONDS, 13, Parent.HAND, 0, 1), 
             Card(Suit.HEARTS, 11, Parent.HAND, 0, 2), 
-            Card(Suit.SPADES, 12, Parent.HAND, 0, 3)]
+            Card(Suit.SPADES, 12, Parent.HAND, 0, 3),
+            Card(Suit.CLUBS, 2, Parent.HAND, 0, 0), 
+            Card(Suit.DIAMONDS, 3, Parent.HAND, 0, 1), 
+            Card(Suit.HEARTS, 4, Parent.HAND, 0, 2), 
+            Card(Suit.SPADES, 5, Parent.HAND, 0, 3),
+            ]
         for i in range(0, numHumanPlayers):
             self.players.append(Player(len(self.players), False, DEBUG_STARTING_HAND))
         for i in range(0, numHumanPlayers):
