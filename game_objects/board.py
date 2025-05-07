@@ -42,10 +42,16 @@ class CardGroup(list):
         return rv
 
 class Board():
-    START_X = 25
+    START_X = 50
     START_Y = 125
+    NUM_ROWS = 4
+    NUM_COLS = 8
+    ROW_SPACING = 100
+    COL_SPACING = 90
+    ZOOM_FACTOR = 1
+    STACK_SPACING = 10
 
-    DRAWVARS = {
+    """DRAWVARS = {
         1: {
             "NUM_ROWS": 2,
             "NUM_COLS": 4,
@@ -62,7 +68,7 @@ class Board():
             "ZOOM_FACTOR": 1,
             "STACK_SPACING": 10,
         }
-    }
+    }"""
 
     def __init__(self, canvas:tk.Canvas):
         # A card group is a set or a run on the board. These cards will be grouped together when drawn
@@ -72,17 +78,17 @@ class Board():
         self.empty_rectangle_hitboxes = {} # card group id => (x0, y0, x1, y1) for clickable region or rectangle
 
         # drawing variables
-        self.expand_level = 1
-        self.loadDrawingVars()
+        '''self.expand_level = 1
+        self.loadDrawingVars()'''
 
-    def loadDrawingVars(self):
+    '''def loadDrawingVars(self):
         """Load the drawing variables based on the current expand level."""
         self.NUM_ROWS = Board.DRAWVARS[self.expand_level]["NUM_ROWS"]
         self.NUM_COLS = Board.DRAWVARS[self.expand_level]["NUM_COLS"]
         self.ROW_SPACING = Board.DRAWVARS[self.expand_level]["ROW_SPACING"]
         self.COL_SPACING = Board.DRAWVARS[self.expand_level]["COL_SPACING"]
         self.ZOOM_FACTOR = Board.DRAWVARS[self.expand_level]["ZOOM_FACTOR"]
-        self.STACK_SPACING = Board.DRAWVARS[self.expand_level]["STACK_SPACING"]
+        self.STACK_SPACING = Board.DRAWVARS[self.expand_level]["STACK_SPACING"]'''
 
     def draw(self):
         """Determine spacing variables, then draw every card group."""
@@ -93,7 +99,7 @@ class Board():
         self.empty_rectangle_hitboxes = {}
 
         # determine board size/drawing variables
-        max_stacks = self.NUM_ROWS * self.NUM_COLS
+        '''max_stacks = Board.NUM_ROWS * Board.NUM_COLS
         if len(self.card_groups) >= max_stacks:
             if (self.expand_level+1) in Board.DRAWVARS:
                 # expand board
@@ -109,26 +115,26 @@ class Board():
                 # move all card groups to be within board
                 for i in range((max_stacks / 4), max_stacks):
                     if i not in self.card_groups: continue
-                    self.splitGroup(i, 0, self.getNextGID(), draw=False)
-        # will initially be 8 card groups but will expand to accommodate as many as possible
-        for i in range(0, self.NUM_ROWS * self.NUM_COLS):
+                    self.splitGroup(i, 0, self.getNextGID(), draw=False)'''
+        # for every spot on the board, draw the associated card group or an empty rectangle
+        for i in range(0, Board.NUM_ROWS * Board.NUM_COLS):
             self.drawCardGroup(i)
 
     def drawCardGroup(self, group_id):
-        row = group_id // self.NUM_COLS
-        col = group_id % self.NUM_COLS
-        x = Board.START_X + col * self.COL_SPACING
-        y = Board.START_Y + row * self.ROW_SPACING
+        row = group_id // Board.NUM_COLS
+        col = group_id % Board.NUM_COLS
+        x = Board.START_X + col * Board.COL_SPACING
+        y = Board.START_Y + row * Board.ROW_SPACING
         if group_id in self.card_groups:
             # draw card group
             for card in self.card_groups[group_id]:
-                card.draw(self.canvas, x, y, self.ZOOM_FACTOR)
-                x += self.STACK_SPACING
-                y += self.STACK_SPACING
+                card.draw(self.canvas, x, y, Board.ZOOM_FACTOR)
+                x += Board.STACK_SPACING
+                y += Board.STACK_SPACING
         else:
             # draw empty rectangle
-            x1 = x + self.ZOOM_FACTOR * DEFAULT_CARD_WIDTH
-            y1 = y + self.ZOOM_FACTOR * DEFAULT_CARD_HEIGHT
+            x1 = x + Board.ZOOM_FACTOR * DEFAULT_CARD_WIDTH
+            y1 = y + Board.ZOOM_FACTOR * DEFAULT_CARD_HEIGHT
             self.empty_rectangles[group_id] = self.canvas.create_rectangle(x, y, x1, y1, fill = "darkgray", width=0)
             self.empty_rectangle_hitboxes[group_id] = (x, y, x1, y1)
 

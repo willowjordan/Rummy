@@ -4,11 +4,10 @@ the cards they hold."""
 from game_objects.card import Card
 
 class Player():
-    def __init__(self, id:int, is_cpu:bool = False, starting_hand:list = []):
+    def __init__(self, id:int, starting_hand:list = []):
         self.score = 0
         self.id = id
         self.hand = starting_hand # list of cards
-        self.is_cpu = is_cpu
     
     def addToHand(self, card:Card):
         self.hand.append(card)

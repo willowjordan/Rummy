@@ -40,11 +40,11 @@ class Game(tk.Tk):
         self.current_screen = SettingsScreen(self)
         self.current_screen.pack()
 
-    def display_game(self, numHumanPlayers, numComputerPlayers):
+    def display_game(self, numPlayers):
         """Destroy current screen and display the game screen using the provided list of players."""
         if self.current_screen is not None:
             self.current_screen.destroy()
-        self.current_screen = GameScreen(self, numHumanPlayers, numComputerPlayers)
+        self.current_screen = GameScreen(self, numPlayers)
         self.current_screen.pack()
 
     def display(self, screen):
@@ -56,5 +56,5 @@ class Game(tk.Tk):
 
 if __name__ == "__main__":
     game = Game()
-    game.display_game(1, 0)
+    game.display_game(6)
     game.mainloop()
