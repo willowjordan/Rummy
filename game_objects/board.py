@@ -7,9 +7,6 @@ class CardGroup(list):
     def __init__(self, cards:list[Card] = []):
         super().__init__(cards)
 
-    def sortCards(self):
-        pass
-
     def isValidRun(self):
         """Return true if this card group is a valid run, false otherwise.
         THIS FUNCTION ASSUMES THE LIST IS SORTED.
@@ -227,3 +224,19 @@ class Board():
             if (not cgroup.isValidRun()) & (not cgroup.isValidSet()):
                 return False
         return True
+    
+    def getClosestCardGroups(self, clickX, clickY):
+        """Given clickX and clickY, return a list of IDs of the 1-4 closest card groups."""
+        if (clickX < Board.START_X) | (clickY < Board.START_Y): return []
+        diffX = clickX - Board.START_X
+        prevCol = diffX // Board.COL_SPACING
+        diffY = clickY - Board.START_Y
+        prevRow = diffY // Board.ROW_SPACING
+        groupIDs = []
+        for row in [prevRow, prevRow-1]:
+            if row < 0: continue
+            for col in [prevCol, prevCol-1]:
+                if col < 0: continue
+                id = row * Board.NUM_COLS + col
+                groupIDs.append(id)
+        return groupIDs

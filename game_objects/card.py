@@ -7,6 +7,7 @@ DEFAULT_CARD_WIDTH = 42
 DEFAULT_CARD_HEIGHT = 60
 
 class Suit(Enum):
+    NONE = -1
     HEARTS = 0
     DIAMONDS = 1
     CLUBS = 2
@@ -45,7 +46,7 @@ class Card():
             For CARDGROUP, the card group's group ID.
         :param card_id: The ID of the card within the parent container.
         """
-        if (value < 1) | (value > 13): raise ValueError(f"Cannot create a card with value {value}")
+        if (value < 0) | (value > 13): raise ValueError(f"Cannot create a card with value {value}")
         self.suit = suit
         self.value = value
         self.parent_type = parent_type
@@ -53,33 +54,55 @@ class Card():
         self.card_id = card_id
 
         # get photoimage object
-        value_path, self.value_str = Card.VALUE_STRINGS[value]
-        self.suit_str = suit.name.lower()
-        path = Card.PLAYING_CARD_PATH.format(suit=self.suit_str, value=value_path)
-        self.image = tk.PhotoImage(file=path)
+        if (value != 0) & (suit != Suit.NONE):
+            value_path, self.value_str = Card.VALUE_STRINGS[value]
+            self.suit_str = suit.name.lower()
+            path = Card.PLAYING_CARD_PATH.format(suit=self.suit_str, value=value_path)
+            self.image = tk.PhotoImage(file=path)
+        else:
+            self.image = tk.PhotoImage(file="card_back.png")
 
         # variables to be set by draw()
         self.zoomed_image = None # PhotoImage that will actually be drawn on board
         self.image_id = None # id of PhotoImage on canvas
         self.click_region = None # region in which a click will register
     
-    def draw(self, canvas:tk.Canvas, x, y, zoom_factor:int):
+    def draw(self, canvas:tk.Canvas, x, y, zoom_factor:int, tk_anchor = tk.NW):
         """Draw the card at x, y with specified zoom factor on specified canvas.
         Set click_region variable accordingly.
         Return the image ID.
         Cards are 42x60 px by default."""
         if self.image_id is not None: self.erase(canvas)
         self.zoomed_image = self.image.zoom(zoom_factor, zoom_factor)
-        self.image_id = canvas.create_image(x, y, image=self.zoomed_image, anchor=tk.NW)
-        self.click_region = (x, y, x+zoom_factor*DEFAULT_CARD_WIDTH, y+zoom_factor*DEFAULT_CARD_HEIGHT)
+        self.image_id = canvas.create_image(x, y, image=self.zoomed_image, anchor=tk_anchor)
+        # determine click region
+        width = zoom_factor * DEFAULT_CARD_WIDTH
+        height = zoom_factor * DEFAULT_CARD_HEIGHT
+        if tk_anchor == tk.NW:
+            self.click_region = (x, y, x+zoom_factor*DEFAULT_CARD_WIDTH, y+zoom_factor*DEFAULT_CARD_HEIGHT)
+        elif tk_anchor == tk.CENTER:
+            self.click_region = (x - width/2, y - height/2, x + width/2, y + height/2)
+        else: raise RuntimeWarning(f"Card draw function is not yet configured for anchor option {tk_anchor}")
         return self.image_id
 
     def erase(self, canvas:tk.Canvas):
         """Erase drawing and unset associated variables."""
-        canvas.delete(self.image_id)
+        # don't throw error if card has already been erased
+        if self.image_id is not None:
+            canvas.delete(self.image_id)
         self.zoomed_image = None
         self.image_id = None
         self.click_region = None
+    
+    def setInternals(self, parent_type, parent_id, card_id):
+        """Set internal location identification variables."""
+        self.parent_type = parent_type
+        self.parent_id = parent_id
+        self.card_id = card_id
 
     def __str__(self):
-        return f"Card object: {self.value_str} of {self.suit_str}"
+        rv = f"Card object: {self.value_str} of {self.suit_str}"
+        rv += f"\n\tParent Type: {self.parent_type}"
+        rv += f"\n\tParent ID: {self.parent_id}"
+        rv += f"\n\tCard ID: {self.card_id}"
+        return rv

@@ -56,5 +56,5 @@ class Game(tk.Tk):
 
 if __name__ == "__main__":
     game = Game()
-    game.display_game(6)
+    game.display_game(2)
     game.mainloop()

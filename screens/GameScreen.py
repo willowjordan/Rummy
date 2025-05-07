@@ -1,3 +1,12 @@
+"""
+TODO: fix not being able to see card's suit in hand
+TODO: fix loadSaveState()
+TODO: add win checking
+TODO: add victory screen
+TODO: add scoring?
+"""
+
+import copy
 import random
 import tkinter as tk
 from enum import Enum
@@ -14,6 +23,11 @@ SELECTION_WIDTH = 2
 HAND_MENU_Y = 550
 TURN_MENU_Y = 700
 TURN_MENU_PLAYER_WIDTH = 100
+
+DECK_X = 640
+DECK_Y = 750
+DISCARD_X = 700
+DISCARD_Y = 750
 
 class TurnPhase(Enum):
     READY = 0
@@ -34,11 +48,11 @@ class GameScreen(tk.Canvas):
         # create and populate deck
         self.deck = []
         for suit in list(Suit):
+            if suit == Suit.NONE: continue
             # 1 (ace) thru 13 (king)
             for value in range(1, 14):
                 self.deck.append(Card(suit, value))
         random.shuffle(self.deck)
-        self.discard = [] # discard pile
 
         # create players and generate starting hands
         if numPlayers == 2:
@@ -53,7 +67,12 @@ class GameScreen(tk.Canvas):
             # draw first n cards
             startingHand = self.deck[0:startingHandSize]
             self.deck = self.deck[startingHandSize:]
+            for j in range(0, startingHandSize):
+                startingHand[j].setInternals(Parent.HAND, i, j)
             self.players.append(Player(len(self.players), startingHand))
+        # draw top card from deck for discard pile
+        self.discard_pile:list[Card] = [self.deck[0]]
+        self.deck = self.deck[1:]
 
         # player whose turn it is
         self.curr_player:Player = self.players[0]
@@ -69,14 +88,22 @@ class GameScreen(tk.Canvas):
         self.player_turnmenu_items = [] # player specific items in turn menu
         for player in self.players:
             self.player_turnmenu_items.append([])
+        self.readyscreen_items = []
+
+        # button regions
+        self.deck_bounds = (619, 720, 661, 780)
+        self.discard_bounds = (679, 720, 721, 780)
+        self.next_turn_bounds = (730, 720, 790, 740)
+        self.reset_bounds = (730, 760, 790, 780)
 
         # bind mouse1 to onClick function
         self.bind("<Button-1>", self.onClick)
+        self.master.bind("<Key>", self.onKeyPress)
 
         # start the game
         self.drawBackground()
         self.board.draw()
-        self.startTurn()
+        self.startReadyPhase()
 
     ### DRAWING FUNCTIONS ###
     def drawBackground(self):
@@ -84,19 +111,27 @@ class GameScreen(tk.Canvas):
         # component backgrounds
         self.create_rectangle(0, 0, 800, 100, fill="darkred", width=0) # info
         self.create_rectangle(0, 100, 800, HAND_MENU_Y, fill=BG_COLOR, width=0) # board
-        self.create_rectangle(0, HAND_MENU_Y, 800, TURN_MENU_Y, fill="darkred", width=0) # hand
+        self.create_rectangle(0, HAND_MENU_Y, 800, 800, fill="darkred", width=0) # hand
 
         # lines separating components
         self.create_line(0, 100, 800, 100, width=2)
         self.create_line(0, HAND_MENU_Y, 800, HAND_MENU_Y, width=2)
         self.create_line(0, HAND_MENU_Y, 800, HAND_MENU_Y, width=2)
-        self.create_line(0, TURN_MENU_Y, 800, TURN_MENU_Y, width=2)
 
         # border lines
         self.create_line(0, 0, 0, 800, width=2)
         self.create_line(0, 800, 800, 800, width=2)
         self.create_line(800, 800, 800, 0, width=2)
         self.create_line(800, 0, 0, 0, width=2)
+
+    def printInfo(self, info:str):
+        """Print a message to the info bar at the top of the screen"""
+        # delete current info text if it exists
+        try:
+            if self.info_text is not None:
+                self.delete(self.info_text)
+        except AttributeError: pass
+        self.info_text = self.create_text(10, 10, text=info, anchor=tk.NW)
 
     def drawHand(self):
         """Draw current player's hand."""
@@ -113,24 +148,27 @@ class GameScreen(tk.Canvas):
         """Draw the list of players, and their facedown cards."""
         # player background squares in turn menu
         for i in range(0, len(self.players)):
-            playerbg = self.create_rectangle(i * TURN_MENU_PLAYER_WIDTH, TURN_MENU_Y, 800, 800, fill="silver", width=0)
+            # draw background rectangle for player, highlighting if it's their turn
+            bg_fill = "silver"
+            if self.players[i] == self.curr_player: bg_fill = "gold"
+            playerbg = self.create_rectangle(i * TURN_MENU_PLAYER_WIDTH, TURN_MENU_Y, 800, 800, fill=bg_fill, width=0)
             self.turnmenu_items.append(playerbg)
             self.drawPlayer(self.players[i])
         for i in range(0, len(self.players)):
+            # draw line between this player and next player
             line_x = TURN_MENU_PLAYER_WIDTH * (i+1)
             line = self.create_line(line_x, TURN_MENU_Y, line_x, 800, width=2)
             self.turnmenu_items.append(line)
+        # line separating turn menu from hand
+        line = self.create_line(0, TURN_MENU_Y, 800, TURN_MENU_Y, width=2)
+        self.turnmenu_items.append(line)
         # buttons for drawing/advancing turn/resetting board
         drawmenu_x = TURN_MENU_PLAYER_WIDTH * 6
-        deck = self.create_image(drawmenu_x + 40, TURN_MENU_Y+50, image=self.card_back, anchor=tk.CENTER)
+        self.drawDeck()
         decklabel = self.create_text(drawmenu_x + 40, TURN_MENU_Y+10, text="Deck", anchor=tk.CENTER)
-        discard = self.create_image(drawmenu_x + 100, TURN_MENU_Y+50, image=self.card_back, anchor=tk.CENTER)
+        self.drawDiscard()
         discardlabel = self.create_text(drawmenu_x + 100, TURN_MENU_Y+10, text="Discard", anchor=tk.CENTER)
-        nextturnbutton = self.create_rectangle(drawmenu_x + 130, TURN_MENU_Y+20, drawmenu_x + 190, TURN_MENU_Y+40, fill="green")
-        nextturnlabel = self.create_text(drawmenu_x+160, TURN_MENU_Y+30, text="End Turn", anchor=tk.CENTER)
-        resetbutton = self.create_rectangle(drawmenu_x + 130, TURN_MENU_Y+60, drawmenu_x + 190, TURN_MENU_Y+80, fill="green")
-        resetlabel = self.create_text(drawmenu_x+160, TURN_MENU_Y+70, text="Reset Board", anchor=tk.CENTER)
-        self.turnmenu_items += [deck, decklabel, discard, discardlabel, nextturnbutton, nextturnlabel, resetbutton, resetlabel]
+        self.turnmenu_items += [decklabel, discardlabel]
 
     def drawPlayer(self, player:Player):
         """Draw a single player's name and cards in the turn menu."""
@@ -153,16 +191,36 @@ class GameScreen(tk.Canvas):
                 cardImg = self.create_image(card_x, card_y, image=self.card_back_small, anchor=tk.NW)
                 self.player_turnmenu_items[player.id].append(cardImg)
 
-    def drawReadyScreen(self):
-        """Draw a screen asking the current player if they're ready to start their turn.
-        This screen will prevent players from seeing each other's hands."""
-        # erase player hand
-        # erase turn menu
-        for item_id in self.turnmenu_items:
+    def drawDeck(self):
+        """Draw the deck centered at DECK_X, DECK_Y"""
+        deck = self.create_image(DECK_X, DECK_Y, image=self.card_back, anchor=tk.CENTER)
+        cards_left = self.create_text(DECK_X, DECK_Y, text=str(len(self.deck)), anchor=tk.CENTER)
+        self.turnmenu_items += [deck, cards_left]
+
+    def drawDiscard(self):
+        """Draw the discard pile centered at DISCARD_X, DISCARD_Y"""
+        if len(self.discard_pile) == 0:
+            dpile = self.create_image(DISCARD_X, DISCARD_Y, image=self.card_back, anchor=tk.CENTER)
+        else:
+            dpile = self.discard_pile[len(self.discard_pile)-1].draw(self, DISCARD_X, DISCARD_Y, 1, tk_anchor=tk.CENTER)
+        self.turnmenu_items += [dpile]
+
+    def drawBlankCard(self, x, y, zoom_factor, tk_anchor = tk.NW):
+        card = Card(Suit.NONE, 0)
+        return card.draw(self, x, y, zoom_factor, tk_anchor)
+    
+    def drawPlayButtons(self):
+        """Draw buttons to be used during play phase."""
+        nextturnbutton = self.create_rectangle(730, 720, 790, 740, fill="green")
+        nextturnlabel = self.create_text(760, 730, text="End Turn", anchor=tk.CENTER)
+        resetbutton = self.create_rectangle(730, 760, 790, 780, fill="green")
+        resetlabel = self.create_text(760, 770, text="Reset Board", anchor=tk.CENTER)
+        self.play_buttons = [nextturnbutton, nextturnlabel, resetbutton, resetlabel]
+
+    def erasePlayButtons(self):
+        """Erase buttons from play phase."""
+        for item_id in self.play_buttons:
             self.delete(item_id)
-        for item_list in self.player_turnmenu_items:
-            for item_id in item_list:
-                self.delete(item_id)
 
     def drawCardSelection(self):
         """Draw an outline around the selected card and any cards above it on the stack."""
@@ -197,12 +255,94 @@ class GameScreen(tk.Canvas):
         else: # CARDGROUP
             return self.board.card_groups[card.parent_id]
 
-    ### MAIN GAME FUNCTIONS ###
+    ### PHASE CHANGE FUNCTIONS ###
+    def startReadyPhase(self):
+        self.turn_phase = TurnPhase.READY
+        # erase player hand
+        # erase turn menu
+        for item_id in self.turnmenu_items:
+            self.delete(item_id)
+        for item_list in self.player_turnmenu_items:
+            for item_id in item_list:
+                self.delete(item_id)
+        self.printInfo(f"Player {self.curr_player.id+1}, press ENTER to begin your turn")
+
     def startTurn(self):
-        """Run start-of-turn routines for the current player."""
+        """Run start-of-turn routines for the current player. Move to draw phase."""
+        self.turn_phase = TurnPhase.DRAW
+        # erase ready phase visual items
+        for item_id in self.readyscreen_items:
+            self.delete(item_id)
         self.drawHand()
         self.drawTurnMenu()
-    
+        self.printInfo(f"Player {self.curr_player.id+1}: Draw a card by clicking the deck or discard pile")
+
+    def moveToPlayPhase(self):
+        """Move to the play phase."""
+        self.turn_phase = TurnPhase.PLAY
+        # redraw hand (since a card was drawn)
+        self.drawHand()
+        # redraw player's entry in menu (since a card was drawn)
+        self.drawPlayer(self.curr_player)
+        self.drawPlayButtons()
+        # create save state of board and player's hand that can be reverted to
+        self.createSaveState()
+        self.printInfo(f"""Player {self.curr_player.id+1}: Play cards from your hand to form sets and runs. You may also move cards around on the board.
+Set: A group of cards of the same value, but different suits. Run: A group of cards of the same suit increasing in value.
+Both sets and runs must contain at least 3 cards.
+Click "Reset Board" to reset the board to its state at the start of this turn.
+Click "End Turn" when you are done playing/moving cards.""")
+
+    def moveToDiscardPhase(self):
+        """Run checks to make sure board is valid. If it is, move to discard phase."""
+        if len(self.curr_player.hand) < 1:
+            self.printInfo("You must keep at least one card in your hand to discard.\nClick \"Reset Board\" to get your cards back and play differently.")
+            return
+        if not self.board.validateGroups():
+            self.printInfo("Not every group on the board is a valid run or set. Try again.")
+            return
+        
+        # checks passed, move on to discard phase
+        self.turn_phase = TurnPhase.DISCARD
+        self.erasePlayButtons()
+        self.printInfo(f"Player {self.curr_player.id+1}: Discard a card to end your turn. Select a card from your hand and click the discard pile.")
+
+    def changeTurns(self):
+        """Attempt to change turns. If changing turns fails, change info message to say why."""
+        # erase current player's hand
+        for card in self.curr_player.hand:
+            card.erase(self)
+        # if all checks pass, advance turn
+        next_id = self.curr_player.id + 1
+        if next_id >= len(self.players):
+            next_id = 0
+        self.curr_player = self.players[next_id]
+        self.startReadyPhase()
+
+    ### PLAY PHASE FUNCTIONS ###
+    def createSaveState(self):
+        """Create a save state of the board and current player's hand."""
+        # shallow copy so that we don't copy the cards as well
+        self.saved_board = copy.copy(self.board)
+        self.saved_hand = copy.copy(self.curr_player.hand)
+
+    def loadSaveState(self):
+        """Reset the board and current player's hand to the last save state."""
+        self.clearSelection()
+        self.board = self.saved_board
+        self.curr_player.hand = self.saved_hand
+        # reset cards' internal data (this may have been overwritten in the copy)
+        for cgroup_id in self.board.card_groups:
+            for i in range(0, len(self.board.card_groups[cgroup_id])):
+                card:Card = self.board.card_groups[cgroup_id][i]
+                card.setInternals(Parent.CARDGROUP, cgroup_id, i)
+        for i in range(0, len(self.curr_player.hand)):
+            card:Card = self.curr_player.hand[i]
+            card.setInternals(Parent.HAND, self.curr_player.id, i)
+        # redraw everything
+        self.board.draw()
+        self.drawHand()
+
     def moveSelectedCard(self, to_group_id:int):
         """Move selected card to specified card group on board.
         If card is in a group, split that group on that card.
@@ -219,16 +359,8 @@ class GameScreen(tk.Canvas):
             self.drawHand() # redraw hand
         else: # CARDGROUP
             self.board.splitGroup(card.parent_id, card.card_id, to_group_id)
+        self.clearSelection()
     
-    def changeTurns(self):
-        """Attempt to change turns. If changing turns fails, change info message to say why."""
-        # if all checks pass, advance turn
-        next_id = self.curr_player.id + 1
-        if next_id >= len(self.players):
-            next_id = 0
-        self.curr_player = self.players[next_id]
-        self.drawReadyScreen()
-
     def selectCard(self, card:Card):
         """Select specified card and draw an outline around it."""
         self.selected_card = card
@@ -242,51 +374,63 @@ class GameScreen(tk.Canvas):
     ### INPUT HANDLING FUNCTIONS ###
     def onClick(self, event:tk.Event):
         if self.turn_phase == TurnPhase.READY:
-            pass
+            return
         elif self.turn_phase == TurnPhase.DRAW:
-            pass
+            self.handleClick_Draw(event)
         elif self.turn_phase == TurnPhase.PLAY:
-            pass
+            self.handleClick_Play(event)
         elif self.turn_phase == TurnPhase.DISCARD:
-            pass
-        #print(f"Click! Event: {event}")
-        # TODO: check buttons
-        if event.y < 600: # on board
-            for cg_id in self.board.card_groups:
-                cgroup = self.board.card_groups[cg_id]
-                click = False
-                # iterate backwards to prioritize top of stack
-                for i in range(len(cgroup)-1, -1, -1):
-                    if not self.wasAreaClicked(cgroup[i].click_region, event):
-                        continue
-                    # if card was clicked:
-                    if self.selected_card is not None:
-                        # if selected card is clicked, deselect
-                        if cgroup[i] == self.selected_card:
-                            self.clearSelection()
-                            return
-                        # if another card in the group is clicked, select that card
-                        if cgroup == self.getParent(self.selected_card):
+            self.handleClick_Discard(event)
+    
+    def handleClick_Draw(self, event:tk.Event):
+        """Handle a click in the draw phase"""
+        if self.wasAreaClicked(self.deck_bounds, event):
+            # draw a card from the deck
+            card = self.deck.pop()
+            self.drawDeck()
+        elif self.wasAreaClicked(self.discard_bounds, event):
+            # draw a card from the discard pile
+            card = self.discard_pile.pop()
+            self.drawDiscard()
+        else: return
+        self.curr_player.addToHand(card)
+        self.moveToPlayPhase()
+
+    def handleClick_Play(self, event:tk.Event):
+        """Handle a click in the play phase"""
+        if event.y < HAND_MENU_Y: # on board
+            # check only the nearest card stacks
+            groups_to_check = self.board.getClosestCardGroups(event.x, event.y)
+            groups_to_check.sort() # check lowest group first
+            for group_id in groups_to_check:
+                if group_id in self.board.card_groups:
+                    cgroup = self.board.card_groups[group_id]
+                    for card in cgroup:
+                        if not self.wasAreaClicked(card.click_region, event):
+                            continue
+                        if self.selected_card is not None:
+                            # if selected card is clicked, deselect
+                            if cgroup[i] == self.selected_card:
+                                self.clearSelection()
+                                return
+                            # if another card in the group is clicked, select that card
+                            if cgroup == self.getParent(self.selected_card):
+                                self.selectCard(cgroup[i])
+                                return
+                            self.moveSelectedCard(group_id)
+                        else: # if no selection, select clicked card
                             self.selectCard(cgroup[i])
-                            return
-                        
-                        self.moveSelectedCard(cg_id)
-                        self.clearSelection()
-                    else:
-                        # if no selection, select clicked card
-                        self.selectCard(cgroup[i])
+                        return
+                else: # no card group here
+                    if not self.wasAreaClicked(self.board.empty_rectangle_hitboxes[group_id], event):
+                        continue
+                    if self.selected_card is not None:
+                        self.moveSelectedCard(group_id)
                     return
-            for group_id in self.board.empty_rectangle_hitboxes:
-                if not self.wasAreaClicked(self.board.empty_rectangle_hitboxes[group_id], event):
-                    continue
-                # if empty stack was clicked
-                if self.selected_card is not None:
-                    self.moveSelectedCard(group_id)
-                    self.clearSelection()
-                return
-        else: # in hand
+        elif event.y < TURN_MENU_Y: # in hand
             hand = self.curr_player.hand
-            for i in range(0, len(hand)):
+            # loop backwards through cards in hand
+            for i in range(len(hand)-1, -1, -1):
                 if not self.wasAreaClicked(hand[i].click_region, event):
                     continue
                 # if card was clicked:
@@ -296,6 +440,44 @@ class GameScreen(tk.Canvas):
                 else:
                     self.selectCard(hand[i])
                 return
+        else: # in turn menu
+            if self.wasAreaClicked(self.next_turn_bounds, event):
+                self.moveToDiscardPhase()
+            elif self.wasAreaClicked(self.reset_bounds, event):
+                self.loadSaveState()
+    
+    def handleClick_Discard(self, event:tk.Event):
+        """Handle a click in the discard phase"""
+        if event.y < HAND_MENU_Y: # on board
+            return
+        if event.y < TURN_MENU_Y: # in hand
+            hand = self.curr_player.hand
+            # loop backwards through cards in hand
+            for i in range(len(hand)-1, -1, -1):
+                if not self.wasAreaClicked(hand[i].click_region, event):
+                    continue
+                # if card was clicked:
+                if hand[i] == self.selected_card:
+                    # if selected card is clicked, deselect
+                    self.clearSelection()
+                else:
+                    self.selectCard(hand[i])
+                return
+        else: # in turn menu
+            if not self.wasAreaClicked(self.discard_bounds, event):
+                return
+            if self.selected_card is not None:
+                # discard selected card
+                self.discard_pile.append(self.selected_card)
+                self.curr_player.hand.remove(self.selected_card)
+                self.selected_card.erase(self)
+                self.clearSelection()
+                self.changeTurns()
+
+    def onKeyPress(self, event:tk.Event):
+        if self.turn_phase != TurnPhase.READY: return
+        if event.keysym == "Return": # ENTER was pressed
+            self.startTurn()
 
     def wasAreaClicked(self, bounds, event:tk.Event):
         """Return true if a specific card was clicked on, false otherwise.
