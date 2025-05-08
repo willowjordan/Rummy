@@ -1,3 +1,9 @@
+"""
+File: VictoryScreen.py
+Author: Willow Jordan
+Purpose: Define a victory screen (overriding tk.Frame) that can be created/displayed by the root.
+"""
+
 import tkinter as tk
 
 from ui_constants import BG_COLOR, UI_FONT, PAD, BUTTON_WIDTH, BUTTON_HEIGHT, TEXT_COLOR

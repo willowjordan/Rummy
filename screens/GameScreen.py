@@ -1,13 +1,19 @@
+"""
+File: GameScreen.py
+Author: Willow Jordan
+Purpose: This script defines the GameScreen object (overriding tk.Canvas). It handles user input and a good portion of the game logic.
+"""
+
 import copy
 import random
 import tkinter as tk
 from enum import Enum
 
 from game_objects.player import Player
-from game_objects.card import Card, Suit, Parent, DEFAULT_CARD_HEIGHT, DEFAULT_CARD_WIDTH
-from game_objects.board import CardGroup, Board
+from game_objects.card import Card, Suit, Parent
+from game_objects.board import Board
 
-from ui_constants import BG_COLOR, UI_FONT, PAD, BUTTON_WIDTH, BUTTON_HEIGHT
+from ui_constants import BG_COLOR
 
 SELECTION_COLOR = "lightblue"
 SELECTION_WIDTH = 2

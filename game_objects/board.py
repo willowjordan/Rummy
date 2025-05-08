@@ -1,6 +1,10 @@
-"""This script defines the Board class, which represents a board upon which cards can be placed."""
+"""
+File: board.py
+Author: Willow Jordan
+Purpose: This script defines the Board class, which represents a board upon which cards can be placed.
+"""
 
-from game_objects.card import Card, Suit, Parent, DEFAULT_CARD_WIDTH, DEFAULT_CARD_HEIGHT
+from game_objects.card import Card, Parent, DEFAULT_CARD_WIDTH, DEFAULT_CARD_HEIGHT
 import tkinter as tk
 
 class CardGroup(list):

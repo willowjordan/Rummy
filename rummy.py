@@ -1,3 +1,8 @@
+"""
+File: rummy.py
+Author: Willow Jordan
+Purpose: The main script, where the tkinter root is defined and called.
+"""
 import random
 import tkinter as tk
 

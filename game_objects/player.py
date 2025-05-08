@@ -1,5 +1,8 @@
-"""This script defines the Player class, which represents one human player and
-the cards they hold."""
+"""
+File: player.py
+Author: Willow Jordan
+Purpose: This script defines the Player class, which represents one human player and the cards they hold.
+"""
 
 from game_objects.card import Card, Parent
 

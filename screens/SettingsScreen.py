@@ -1,3 +1,9 @@
+"""
+File: SettingsScreen.py
+Author: Willow Jordan
+Purpose: This script defines the SettingsScreen object (overriding tk.Frame), representing a screen where the user can enter the number of players and start the game.
+"""
+
 import tkinter as tk
 
 from ui_constants import BG_COLOR, UI_FONT, PAD, BUTTON_WIDTH, BUTTON_HEIGHT, TEXT_COLOR

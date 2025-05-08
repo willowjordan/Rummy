@@ -1,4 +1,8 @@
-"""This script defines the Card class, which represents a single playing card."""
+"""
+File: card.py
+Author: Willow Jordan
+Purpose: This script defines the Card class, which represents a single playing card.
+"""
 
 import tkinter as tk
 from enum import Enum
