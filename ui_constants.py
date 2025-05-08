@@ -3,3 +3,4 @@ BUTTON_WIDTH = 40
 BUTTON_HEIGHT = 7
 PAD = 10
 UI_FONT = ('Arial', 18)
+TEXT_COLOR = "white"

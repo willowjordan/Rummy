@@ -1,17 +1,10 @@
-"""
-
-"""
-
 import random
 import tkinter as tk
-
-from game_objects.player import Player
-from game_objects.card import Card, Suit
-from game_objects.board import CardGroup, Board
 
 from screens.TitleScreen import TitleScreen
 from screens.SettingsScreen import SettingsScreen
 from screens.GameScreen import GameScreen
+from screens.VictoryScreen import VictoryScreen
 
 from ui_constants import BG_COLOR
 
@@ -47,6 +40,12 @@ class Game(tk.Tk):
         self.current_screen = GameScreen(self, numPlayers)
         self.current_screen.pack()
 
+    def display_victory(self, scores):
+        if self.current_screen is not None:
+            self.current_screen.destroy()
+        self.current_screen = VictoryScreen(self, scores)
+        self.current_screen.pack()
+
     def display(self, screen):
         """Destroy current screen and display provided screen."""
         if self.current_screen is not None:
@@ -56,5 +55,4 @@ class Game(tk.Tk):
 
 if __name__ == "__main__":
     game = Game()
-    game.display_game(2)
     game.mainloop()

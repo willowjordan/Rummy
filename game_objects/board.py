@@ -41,7 +41,7 @@ class CardGroup(list):
 class Board():
     START_X = 50
     START_Y = 125
-    NUM_ROWS = 4
+    NUM_ROWS = 3
     NUM_COLS = 8
     ROW_SPACING = 100
     COL_SPACING = 90
@@ -171,7 +171,7 @@ class Board():
 
     def addToGroup(self, group_id:int, card:Card, draw = True):
         """Add given card to card group with given ID."""
-        if group_id not in self.card_groups.keys(): 
+        if group_id not in self.card_groups.keys():
             # create new card group
             self.makeGroup([], group_id)
         self.card_groups[group_id].append(card) # add card
@@ -201,14 +201,17 @@ class Board():
         :param new_group_id: ID of new group (must not be an existing group)
         """
         if group_id not in self.card_groups.keys():
-            raise ValueError("Provided group ID to split doesn't exist")
+            raise ValueError(f"Provided group ID {group_id} to split doesn't exist")
         new_group_cards = self.card_groups[group_id][card_id:]
-        self.card_groups[group_id] = self.card_groups[group_id][:card_id]
+        self.card_groups[group_id] = CardGroup(self.card_groups[group_id][:card_id])
         if len(self.card_groups[group_id]) == 0:
             del self.card_groups[group_id]
-            if draw: self.drawCardGroup(group_id)
+        #self.makeGroup(new_group_cards, new_group_id, draw)
         for card in new_group_cards:
             self.addToGroup(new_group_id, card, draw)
+        if draw:
+            self.drawCardGroup(group_id)
+            self.drawCardGroup(new_group_id)
 
     def validateGroups(self):
         """Return true if every card group is a valid run or set.
@@ -216,11 +219,10 @@ class Board():
         Valid runs have sequential cards of the same suit.
         Valid sets have cards of the same value but different suits.
         """
-        for cgroup in self.card_groups.values():
+        for cgroup_id in self.card_groups:
+            cgroup = self.card_groups[cgroup_id]
             # length check
             if len(cgroup) < 3: return False
-            # sort before running validity checks
-            cgroup.sortCards()
             if (not cgroup.isValidRun()) & (not cgroup.isValidSet()):
                 return False
         return True
@@ -235,8 +237,10 @@ class Board():
         groupIDs = []
         for row in [prevRow, prevRow-1]:
             if row < 0: continue
+            if row >= Board.NUM_ROWS: continue
             for col in [prevCol, prevCol-1]:
                 if col < 0: continue
+                if col >= Board.NUM_COLS: continue
                 id = row * Board.NUM_COLS + col
                 groupIDs.append(id)
         return groupIDs
