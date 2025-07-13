@@ -13,7 +13,7 @@ from game_objects.player import Player
 from game_objects.card import Card, Suit, Parent
 from game_objects.board import Board
 
-from ui_constants import BG_COLOR
+from ui_constants import BG_COLOR, UI_FONT
 
 SELECTION_COLOR = "lightblue"
 SELECTION_WIDTH = 2
@@ -32,6 +32,19 @@ class TurnPhase(Enum):
     DRAW = 1
     PLAY = 2
     DISCARD = 3
+
+"""class GameButton():
+    def __init__(self, canvas:tk.Canvas, x, y, width, height, color, on_click:function):
+        self.canvas = canvas
+        self.bounds = (x, y, x+width, y+height)
+        self.function = function
+        self.bg = canvas.create_rectangle(*self.bounds, fill=color)
+        self.on_click = on_click
+    
+    def addLabel(self, text:str, textColor="black", font=UI_FONT):
+        x = (self.bounds[0] + self.bounds[2]) / 2
+        y = (self.bounds[1] + self.bounds[3]) / 2
+        self.label = self.canvas.create_text(x, y, text=text, fill=textColor, font=font, anchor=tk.CENTER)"""
 
 class GameScreen(tk.Canvas):
     def __init__(self, master, numPlayers = 2):
@@ -397,7 +410,7 @@ Click "End Turn" when you are done playing/moving cards.""")
     
     def handleClick_Draw(self, event:tk.Event):
         """Handle a click in the draw phase"""
-        if self.wasAreaClicked(self.deck_bounds, event):
+        if self.posInBounds(self.deck_bounds, (event.x, event.y)):
             # draw a card from the deck
             card = self.deck.pop()
             # if deck is empty, shuffle discard into deck
@@ -406,7 +419,7 @@ Click "End Turn" when you are done playing/moving cards.""")
                 random.shuffle(self.deck)
                 self.discard_pile = [self.deck.pop()]
             self.drawDeck()
-        elif self.wasAreaClicked(self.discard_bounds, event):
+        elif self.posInBounds(self.discard_bounds, (event.x, event.y)):
             # draw a card from the discard pile
             card = self.discard_pile.pop()
             self.drawDiscard()
@@ -417,6 +430,22 @@ Click "End Turn" when you are done playing/moving cards.""")
     def handleClick_Play(self, event:tk.Event):
         """Handle a click in the play phase"""
         if event.y < HAND_MENU_Y: # on board
+            """board_card = self.getBoardCardIDs(event.x, event.y)
+            if board_card is not None:
+                cgroup_id, card_id = board_card
+                if self.selected_card is not None:
+                    if self.selected_card.parent_id == cgroup_id:
+                        if self.selected_card.card_id == card_id:
+                            # if selected card is clicked, deselect
+                            self.clearSelection()
+                            return
+                        # if another card in the group is clicked, select that card
+                        self.selectCard(cgroup[i])
+                        return
+                    # otherwise, move the selected card to the clicked group
+                    self.moveSelectedCard(cgroup_id)
+                else: # if no selection, select clicked card
+                    self.selectCard(cgroup[i])"""
             # check only the nearest card stacks
             groups_to_check = self.board.getClosestCardGroups(event.x, event.y)
             groups_to_check.sort() # check lowest group first
@@ -483,14 +512,51 @@ Click "End Turn" when you are done playing/moving cards.""")
         if self.turn_phase != TurnPhase.READY: return
         if event.keysym == "Return": # ENTER was pressed
             self.startTurn()
-
-    def wasAreaClicked(self, bounds, event:tk.Event):
-        """Return true if a specific card was clicked on, false otherwise.
-        :param bounds: (x0, y0, x1, y1) of a rectangular area to check
-        :param event: The click event
+    
+    def getBoardCardIDs(self, x, y):
+        """Return the IDs of card on the board at (x, y).
+        Return None if no card on board exists at (x, y), or (x, y) is outside board.\n
+        :param x: X position to check\n
+        :param y: Y position to check\n
+        :return: Tuple containing (card group ID, card ID (in group))
         """
-        if event.x < bounds[0]: return False
-        if event.y < bounds[1]: return False
-        if event.x > bounds[2]: return False
-        if event.y > bounds[3]: return False
+        if y > HAND_MENU_Y: # not on board
+            return None
+        # check only the nearest card stacks
+        groups_to_check = self.board.getClosestCardGroups(x, y)
+        groups_to_check.sort() # check lowest group first
+        for group_id in groups_to_check:
+            if group_id in self.board.card_groups:
+                cgroup = self.board.card_groups[group_id]
+                for i in range(len(cgroup)-1, -1, -1):
+                    if self.posInBounds(cgroup[i].click_region, (x, y)):
+                        return (cgroup[i].parent_id, cgroup[i].card_id)
+            else: # no card group here
+                if self.posInBounds(self.board.empty_rectangle_hitboxes[group_id], (x, y)):
+                    return (group_id, 0)
+        return None
+        
+    def getHandCardID(self, x, y):
+        """Return the card ID of card in hand at (x, y).
+        Return None if no card in hand exists at (x, y), or (x, y) is outside board."""
+        if y < HAND_MENU_Y: # on board
+            return None
+        if y > TURN_MENU_Y: # in turn menu
+            return None
+        hand = self.curr_player.hand
+        # loop backwards through cards in hand
+        for i in range(len(hand)-1, -1, -1):
+            if self.posInBounds(hand[i].click_region, (x, y)):
+                return hand[i].card_id
+        return None
+
+    def posInBounds(self, bounds:tuple, pos:tuple=None):
+        """Return true if (x, y) is in the given bounds.
+        :param bounds: (x0, y0, x1, y1) of a rectangular area to check.
+        :param pos: (x, y) of the position to check.
+        """
+        if pos[0] < bounds[0]: return False
+        if pos[1] < bounds[1]: return False
+        if pos[0] > bounds[2]: return False
+        if pos[1] > bounds[3]: return False
         return True

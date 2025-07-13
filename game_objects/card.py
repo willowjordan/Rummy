@@ -110,3 +110,7 @@ class Card():
         rv += f"\n\tParent ID: {self.parent_id}"
         rv += f"\n\tCard ID: {self.card_id}"
         return rv
+
+class EmptyCard(Card):
+    """An object representing an empty stack on the board."""
+    
